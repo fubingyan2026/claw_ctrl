@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GD32F503 J-Link (SWD)",
+      "type": "cortex-debug",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "servertype": "jlink",
+      "device": "GD32F503KEU7",
+      "interface": "swd",
+      "executable": "${workspaceFolder}/build/Debug/claw_ctrl.elf",
+      "runToEntryPoint": "main",
+      "preLaunchTask": "Build Debug"
+    }
+  ]
+}

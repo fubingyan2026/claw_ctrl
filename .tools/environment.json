@@ -1,0 +1,6 @@
+﻿{
+    "ArmGccBin":  "C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi\\bin",
+    "CMakeExe":  "C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\cmake-3.31.6-windows-x86_64\\bin\\cmake.exe",
+    "NinjaExe":  "C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\ninja-1.12.1\\ninja.exe",
+    "JLinkServerExe":  "C:\\Program Files\\SEGGER\\JLink_V950\\JLinkGDBServerCL.exe"
+}

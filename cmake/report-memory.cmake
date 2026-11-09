@@ -1,0 +1,15 @@
+# Use the selected GNU toolchain, independently of STM32Cube project discovery.
+execute_process(COMMAND "${SIZE_TOOL}" -B "${ELF_FILE}"
+    RESULT_VARIABLE _result OUTPUT_VARIABLE _output ERROR_VARIABLE _error)
+if(NOT _result EQUAL 0)
+    message(FATAL_ERROR "Cannot read ELF sizes: ${_error}")
+endif()
+string(REGEX MATCH "[\r\n][ \t]*([0-9]+)[ \t]+([0-9]+)[ \t]+([0-9]+)" _sizes "${_output}")
+if(NOT _sizes)
+    message(FATAL_ERROR "Unrecognized GNU size output: ${_output}")
+endif()
+math(EXPR _flash "${CMAKE_MATCH_1} + ${CMAKE_MATCH_2}")
+math(EXPR _ram "${CMAKE_MATCH_2} + ${CMAKE_MATCH_3}")
+message(STATUS "GD32F503KEU7 memory usage: ${ELF_FILE}")
+message(STATUS "FLASH: ${_flash} / 524288 bytes (text + initialized data)")
+message(STATUS "RAM:   ${_ram} / 65536 bytes (data + BSS, including reserved heap/stack)")

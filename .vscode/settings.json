@@ -1,0 +1,16 @@
+﻿{
+    "files.associations":  {
+                               "*.h":  "c"
+                           },
+    "cmake.useCMakePresets":  "always",
+    "C_Cpp.default.configurationProvider":  "ms-vscode.cmake-tools",
+    "cmake.cmakePath":  "C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\cmake-3.31.6-windows-x86_64\\bin\\cmake.exe",
+    "cortex-debug.JLinkGDBServerPath":  "C:\\Program Files\\SEGGER\\JLink_V950\\JLinkGDBServerCL.exe",
+    "stm32cube-ide-build-cmake.ignoreCubeProjectDiscovery":  true,
+    "cortex-debug.armToolchainPath":  "C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi\\bin",
+    "cmake.configureOnOpen":  true,
+    "cmake.environment":  {
+                              "ARM_GCC_PATH":  "C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi\\bin",
+                              "PATH":  "C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\arm-gnu-toolchain-14.2.rel1-mingw-w64-i686-arm-none-eabi\\bin;C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\cmake-3.31.6-windows-x86_64\\bin;C:\\Users\\32457\\Desktop\\claw_ctrl\\.tools\\ninja-1.12.1;${env:PATH}"
+                          }
+}
