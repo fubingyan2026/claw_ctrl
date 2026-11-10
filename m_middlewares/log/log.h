@@ -106,11 +106,24 @@ typedef struct {
 #define LOG_COLOR_UNDERLINE "\033[4m"
 
 /* 默认配置 */
-#define LOG_DEFAULT_FORMAT_BUFFER_SIZE (256)
-#define LOG_DEFAULT_TX_BUFFER_SIZE     (1024 * 4)
+#define LOG_DEFAULT_FORMAT_BUFFER_SIZE (256U)
+#define LOG_DEFAULT_TX_BUFFER_SIZE     (4096U)
 #define LOG_DEFAULT_LEVEL              LOG_LEVEL_INFO
 #define LOG_DEFAULT_ENABLE_COLOR       (true)
 #define LOG_DEFAULT_ENABLE_TIMESTAMP   (true)
+
+/* Exported types ------------------------------------------------------------*/
+
+/**
+ * @brief 日志落盘回调函数类型（Flash 持久化钩子）
+ *
+ * @param level 日志级别
+ * @param line  完整格式化后的日志行（含 ANSI 颜色码及行尾 CRLF）
+ * @param len   日志行长度（字节）
+ * @note  回调在 log_log() 调用上下文中同步执行（可能处于中断上下文），
+ *        必须在返回前复制所需数据；回调内禁止再次调用 log_* 系列函数（防止重入）。
+ */
+typedef void (*log_flash_sink_cb_t)(log_level_t level, const char* line, uint16_t len);
 
 /* Exported macro ------------------------------------------------------------*/
 
@@ -221,6 +234,25 @@ log_error_t log_set_color_enable(bool enable);
 log_error_t log_set_timestamp_enable(bool enable);
 
 /**
+ * @brief 暂停/恢复格式化日志（LOG_* 与 hexdump）的 TX 输出
+ * @param hold true=暂停（仅 log_write 仍可输出），false=恢复
+ * @return 操作结果错误码
+ * @note  用于 Flash 日志 dump 期间屏蔽实时日志、避免与历史记录混排。
+ *        暂停仅屏蔽 TX 队列写入；若已注册落盘钩子，WARN/ERROR 仍会持久化不丢失。
+ *        log_write() / log_tx_*() 不受影响。
+ */
+log_error_t log_hold_output(bool hold);
+
+/**
+ * @brief 注册日志落盘回调（Flash 持久化钩子）
+ * @param cb 回调函数指针（NULL=取消注册）
+ * @return 操作结果错误码
+ * @note  注册后，每次成功格式化输出的日志行都会同步上抛给回调，
+ *        由调用方决定是否持久化（如 WARN/ERROR 落盘）。默认不注册，行为无变化。
+ */
+log_error_t log_set_flash_sink_cb(log_flash_sink_cb_t cb);
+
+/**
  * @brief 日志输出
  * @param level 日志级别
  * @param tag 日志标签
@@ -253,6 +285,12 @@ log_error_t log_write(const uint8_t* data, uint32_t len);
  * @return 缓冲区中的数据长度，未初始化返回0
  */
 uint32_t log_tx_len(void);
+
+/**
+ * @brief 获取输出缓冲区剩余可写空间
+ * @return 可写入的字节数，未初始化返回0
+ */
+uint32_t log_tx_avail(void);
 
 /**
  * @brief 从输出缓冲区取出数据

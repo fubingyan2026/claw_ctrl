@@ -6,7 +6,7 @@
 
 /**
  * @file    indicator_task.c
- * @brief   双电机状态指示灯任务
+ * @brief   双电机状态指示、补光灯命令和控制板心跳任务
  */
 
 #include "indicator_task.h"
@@ -17,6 +17,7 @@
 #include "main.h"
 #include "srv_indicator.h"
 #include "srv_juxie.h"
+#include "srv_board_protocol.h"
 
 #define INDICATOR_TICK_PERIOD_MS (10U)
 
@@ -58,6 +59,7 @@ void indicator_task_init(void)
     s_initialized = true;
 
     s_can_ok = drv_can_init();
+    if (s_can_ok) { srv_board_protocol_init(now); }
 
     if (!s_can_ok) {
         drv_rgb_led_set(IND_LEVEL_RED, 0U, 0U);
@@ -81,7 +83,11 @@ void indicator_task_step(void)
 
     drv_can_msg_t msg;
     while (drv_can_recv(&msg)) {
-        srv_juxie_on_frame(&msg, now);
+        if (msg.id == BOARD_CAN_LIGHT_COMMAND_ID) {
+            (void)srv_board_protocol_on_frame(&msg, now);
+        } else {
+            srv_juxie_on_frame(&msg, now);
+        }
     }
 
     if ((now - s_last_tick_ms) >= INDICATOR_TICK_PERIOD_MS) {
@@ -113,6 +119,8 @@ void indicator_task_step(void)
         s_last_drop_log_ms = now;
     }
 
-    /* 把本轮新入队的同步帧尽快提交 */
+    srv_board_protocol_step(now);
+
+    /* 把本轮新入队的同步帧和状态帧尽快提交 */
     drv_can_poll();
 }

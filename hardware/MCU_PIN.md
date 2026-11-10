@@ -47,7 +47,7 @@
 - U3 SWD：脚1 GND、脚2 SWDIO、脚3 SWCLK、脚4 3V3；NRST 未接此连接器。3V3 用作调试器参考电压，板子由电源接口供电。
 - CN1 UART：脚1 GND、脚2 MCU TX、脚3 MCU RX；连接 USB-UART 时交叉接收发，3.3 V 电平，115200 8N1。
 - RGB LED3 为共阳：脚2 接 3V3，脚1红、脚3绿、脚4蓝。PWM 1 kHz，亮度 0..1000，CCR=1000-level，初始化熄灭。
-- 补光灯 PA6 为高有效 PWM，1 kHz，默认占空比 0；`drv_fill_light_set()` 设置 0..1000，尚未添加 CAN 调光协议。
+- 补光灯 PA6 为高有效 PWM，5 kHz（周期 200 μs），直连 U8 DIM，使用数字 PWM 调光；默认占空比 0；`drv_fill_light_set()` 设置 0..1000（0..100% 占空比）；CAN 0 立即关灯，非零有效值平滑调光，不使用 1.1..3.1 V 模拟调光表；由 CAN 0x220 设置，0x221 上报状态；详见 docs/can-protocol.md。
 - CAN0 使用 ISO CAN FD，仲裁/数据均 1 Mbps，无 BRS；自动 Bus-Off 恢复，关闭自动重发，与参考工程发送策略一致。
 - 使用官方系统时钟配置：外部 8 MHz → PLL → 252 MHz；AHB/APB2 252 MHz、APB1 126 MHz，TIMER1/2 时钟 252 MHz。
 

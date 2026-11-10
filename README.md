@@ -29,7 +29,7 @@ CAN FD 使用 ISO 模式，仲裁段/数据段均 1Mbps，不启用 BRS。
 状态指示：正常白色常亮，故障红色常亮，未使能绿色闪烁，升级蓝色闪烁。
 该工程检测升级会话，不实现 MCU 自身 bootloader，也不实现电机固件升级传输。
 
-补光灯新增 `drv_fill_light_set(0..1000)`，上电默认关闭；参考工程没有补光灯通信协议，因此未新增 CAN 调光命令。
+补光灯通过 `0x220` 设置 5 kHz PWM 亮度（0..1000 对应 0..100% 占空比，0 立即关灯，非零平滑变化），上电默认关闭；控制板每 500ms 主动发送 `0x221` 心跳/状态，合法调光命令另触发即时状态上报。完整字段、示例和时序见 [CAN 协议 V1.2](docs/can-protocol.md)。
 USART0 为 PB6 TX / PB7 RX，115200 8N1。日志 TX 使用 DMA0 CH3；RX 引脚已配置，未实现 RX DMA/接收协议。
 
 ## 编译
@@ -94,7 +94,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test.ps1
 
 测试启用 AddressSanitizer 和 UndefinedBehaviorSanitizer，覆盖双电机正常/故障/恢复/离线、升级会话超时、空闲查询、灯效、消息队列满/空与 32位时基/队列计数回绕。
 Debug、Release 构建均已通过，未出现编译和链接警告。主机测试不替代外设和实板验证。
-上板需确认：115200 日志、红绿蓝顺序、PA6 上电为低、1kHz PWM、CAN FD 1Mbps 无 BRS 下的反馈/同步帧，以及 Bus-Off 后恢复。
+上板需确认：115200 日志、红绿蓝顺序、PA6 上电为低、补光灯 5kHz PWM（RGB 仍为 1kHz）、CAN FD 1Mbps 无 BRS 下的反馈/同步帧，以及 Bus-Off 后恢复。
 
 ## 移植说明与来源
 
@@ -109,3 +109,5 @@ Debug、Release 构建均已通过，未出现编译和链接警告。主机测�
 - [Cortex-Debug 配置说明](https://github.com/Marus/cortex-debug/blob/master/debug_attributes.md)
 
 官方库及参考代码保留各文件原版权说明，许可说明以 `Drivers` 中各文件保留的原始声明及所获取官方 SDK 的许可文件为准。
+
+中间件已从 R1_CTU_POWER 导入，详见 [移植说明](m_middlewares/PORTING.md)。补光灯非零亮度采用 PT1 平滑，约 100ms 时间常数，关灯立即执行；心跳回报目标亮度。

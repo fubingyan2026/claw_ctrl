@@ -22,16 +22,15 @@ add_executable(claw_ctrl
     ${CMSIS}/Source/GCC/startup_gd32f50x.S
     device_drivers/drv_can.c device_drivers/drv_uart.c
     device_drivers/drv_rgb_led.c device_drivers/drv_fill_light.c
-    service/srv_juxie.c service/srv_indicator.c
-    tasks/indicator_task.c tasks/log_task.c
-    m_middlewares/utils/kfifo.c m_middlewares/utils/msg_fifo.c
-    m_middlewares/log/log.c m_middlewares/Third_Party/mpaland_printf/printf.c)
+    service/srv_juxie.c service/srv_indicator.c service/srv_board_protocol.c service/srv_fill_light.c
+    tasks/indicator_task.c tasks/log_task.c)
 set_target_properties(claw_ctrl PROPERTIES SUFFIX .elf)
 target_include_directories(claw_ctrl PRIVATE device_drivers service tasks
     m_middlewares/utils m_middlewares/log m_middlewares/Third_Party/mpaland_printf)
 target_compile_definitions(claw_ctrl PRIVATE PRINTF_DISABLE_SUPPORT_FLOAT PRINTF_DISABLE_SUPPORT_EXPONENTIAL)
 target_compile_options(claw_ctrl PRIVATE -Wall -Wextra -Wshadow)
-target_link_libraries(claw_ctrl PRIVATE gd32f50x)
+add_subdirectory(m_middlewares)
+target_link_libraries(claw_ctrl PRIVATE gd32f50x m_middlewares)
 target_link_options(claw_ctrl PRIVATE
     -T${CMAKE_CURRENT_SOURCE_DIR}/gd32f503xE_flash.ld
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/claw_ctrl.map

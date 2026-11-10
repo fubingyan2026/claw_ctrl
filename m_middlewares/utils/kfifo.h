@@ -23,7 +23,18 @@ extern "C" {
 /* ========================================================================== */
 
 /* 1. 引入平台底层依赖头文件 */
-#include "main.h"
+#if defined(__arm__) || defined(__thumb__)
+#include "cmsis_compiler.h"
+#ifndef KFIFO_MEM_BARRIER
+#define KFIFO_MEM_BARRIER() __DMB()
+#endif
+#ifndef KFIFO_LOCK
+#define KFIFO_LOCK(flags) do { (flags)=__get_PRIMASK(); __disable_irq(); } while(0)
+#endif
+#ifndef KFIFO_UNLOCK
+#define KFIFO_UNLOCK(flags) do { __set_PRIMASK(flags); } while(0)
+#endif
+#endif
 /* 2. 内存分配与释放接口 — 本项目使用静态内存分配，禁用动态分配 */
 #ifndef KFIFO_MALLOC
 #define KFIFO_MALLOC(size) NULL /* 静态分配模式，返回 NULL */
@@ -40,25 +51,29 @@ extern "C" {
 #define KFIFO_MEM_BARRIER()
 #endif
 
-/* 4. 临界区保护接口（解决多线程/嵌套中断并发安全）
- * RISC-V 通过 mstatus.MIE 位控制全局中断，将 MIE 状态压栈/出栈实现嵌套保护。 */
+/* 4. 临界区保护接口（解决 ISR 与主循环并发安全）
+ * 默认不保护。需要时在编译前定义 KFIFO_LOCK/UNLOCK：
+ *
+ *   Cortex-M (STM32) 裸机：
+ *     #define KFIFO_LOCK(flags)   do { (flags) = __get_PRIMASK(); __disable_irq(); } while(0)
+ *     #define KFIFO_UNLOCK(flags) do { __set_PRIMASK(flags); } while(0)
+ *
+ *   FreeRTOS:
+ *     #define KFIFO_LOCK(flags)   taskENTER_CRITICAL()
+ *     #define KFIFO_UNLOCK(flags) taskEXIT_CRITICAL()
+ *
+ *   RISC-V:
+ *     #define KFIFO_LOCK(flags)   do { flags = riscv_disable_irq_save(); } while(0)
+ *     #define KFIFO_UNLOCK(flags) do { riscv_restore_irq(flags); } while(0)
+ */
 typedef uint32_t kfifo_lock_state_t;
 
 #ifndef KFIFO_LOCK
-/* STM32 裸机安全嵌套中断锁。如果用 FreeRTOS，可换成 taskENTER_CRITICAL_FROM_ISR
- */
-#define KFIFO_LOCK(flags)          \
-    do {                           \
-        (flags) = __get_PRIMASK(); \
-        __disable_irq();           \
-    } while (0)
+#define KFIFO_LOCK(flags)          ((void)(flags))
 #endif
 
 #ifndef KFIFO_UNLOCK
-#define KFIFO_UNLOCK(flags)   \
-    do {                      \
-        __set_PRIMASK(flags); \
-    } while (0)
+#define KFIFO_UNLOCK(flags)        ((void)(flags))
 #endif
 
 /* ==========================================================================

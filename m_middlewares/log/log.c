@@ -40,16 +40,18 @@ static const char* const s_level_colors[] = {
     LOG_COLOR_RED, /**< ERROR - 红色 */
     LOG_COLOR_YELLOW, /**< WARN - 黄色 */
     LOG_COLOR_GREEN, /**< INFO - 绿色 */
-    LOG_COLOR_BLUE, /**< DEBUG - 蓝色 */
-    LOG_COLOR_RESET, /**< TRACE - 无颜色 */
+    LOG_COLOR_WHITE, /**< DEBUG - 蓝色 */
+    LOG_COLOR_GRAY, /**< TRACE - 无颜色 */
 };
 
 /* Private variables ---------------------------------------------------------*/
 
-/** @brief 格式化缓冲区 */
-static char s_format_buffer[LOG_DEFAULT_FORMAT_BUFFER_SIZE];
-
-/** @brief 输出 FIFO 缓冲区 */
+/**
+ * @brief 输出 FIFO 缓冲区
+ * @note 格式化缓冲不再使用模块级静态数组：log_log 可能被主循环与中断
+ *       上下文同时调用，共享静态缓冲会被 ISR 踩踏产生乱码。改为每调用
+ *       使用栈上缓冲（见 log_format_output / log_hexdump）。
+ */
 static uint8_t s_log_tx_buffer[LOG_DEFAULT_TX_BUFFER_SIZE];
 
 /** @brief 输出 FIFO 实例 */
@@ -58,8 +60,14 @@ static kfifo_t s_tx_fifo;
 /** @brief 当前日志级别 */
 static uint8_t s_current_level = LOG_DEFAULT_LEVEL;
 
+/** @brief TX 输出暂停标志（dump 期间屏蔽实时日志） */
+static bool s_output_held = false;
+
 /** @brief 初始化标志 */
 static bool s_initialized = false;
+
+/** @brief 日志落盘回调（由外部通过 log_set_flash_sink_cb 注册） */
+static log_flash_sink_cb_t s_flash_sink_cb = NULL;
 
 /** @brief 模块配置实例 */
 static log_config_t s_config = {
@@ -104,25 +112,16 @@ log_error_t log_init(const log_config_t* config)
     }
 
     s_config.get_timestamp_cb = config->get_timestamp_cb;
-
-    if (config->name) {
-        s_config.name = config->name;
-    }
-
-    if (config->tx_buffer && config->tx_buffer_size >= 2U) {
-        s_config.tx_buffer = config->tx_buffer;
-        s_config.tx_buffer_size = config->tx_buffer_size;
-    }
-
-    if (config->format_buffer_size > 0U
-        && config->format_buffer_size <= sizeof(s_format_buffer)) {
-        s_config.format_buffer_size = config->format_buffer_size;
-    }
-
+    s_config.name = config->name ? config->name : "log";
+    s_config.tx_buffer = config->tx_buffer ? config->tx_buffer : s_log_tx_buffer;
+    s_config.tx_buffer_size = config->tx_buffer ? config->tx_buffer_size : sizeof(s_log_tx_buffer);
+    if (s_config.tx_buffer_size < 2U || (s_config.tx_buffer_size & (s_config.tx_buffer_size - 1U)) != 0U) { return LOG_ERROR_INVALID_PARAM; }
     s_config.default_level = config->default_level;
     s_config.enable_color = config->enable_color;
     s_config.enable_timestamp = config->enable_timestamp;
-    s_current_level = s_config.default_level;
+    s_config.format_buffer_size = (config->format_buffer_size > 0U && config->format_buffer_size <= LOG_DEFAULT_FORMAT_BUFFER_SIZE) ? config->format_buffer_size : LOG_DEFAULT_FORMAT_BUFFER_SIZE;
+    s_current_level = config->default_level;
+    s_output_held = false;
 
     kfifo_init(&s_tx_fifo, s_config.tx_buffer, s_config.tx_buffer_size, NULL);
 
@@ -137,14 +136,15 @@ log_error_t log_init(const log_config_t* config)
 void log_deinit(void)
 {
     s_config.name = "log";
-    s_config.tx_buffer = s_log_tx_buffer;
+    s_config.tx_buffer = NULL;
     s_config.get_timestamp_cb = NULL;
-    s_config.tx_buffer_size = sizeof(s_log_tx_buffer);
+    s_config.tx_buffer_size = 0;
     s_config.format_buffer_size = LOG_DEFAULT_FORMAT_BUFFER_SIZE;
     s_config.default_level = LOG_DEFAULT_LEVEL;
     s_config.enable_color = LOG_DEFAULT_ENABLE_COLOR;
     s_config.enable_timestamp = LOG_DEFAULT_ENABLE_TIMESTAMP;
     s_current_level = LOG_DEFAULT_LEVEL;
+    s_flash_sink_cb = NULL;
     kfifo_reset(&s_tx_fifo);
     s_initialized = false;
 }
@@ -224,6 +224,38 @@ log_error_t log_set_timestamp_enable(bool enable)
 }
 
 /**
+ * @brief 暂停/恢复格式化日志（LOG_* 与 hexdump）的 TX 输出
+ * @param hold true=暂停（仅 log_write 仍可输出），false=恢复
+ * @return 操作结果错误码
+ */
+log_error_t log_hold_output(bool hold)
+{
+    if (!s_initialized) {
+        return LOG_ERROR_UNINITIALIZED;
+    }
+
+    s_output_held = hold;
+
+    return LOG_OK;
+}
+
+/**
+ * @brief 注册日志落盘回调（Flash 持久化钩子）
+ * @param cb 回调函数指针（NULL=取消注册）
+ * @return 操作结果错误码
+ */
+log_error_t log_set_flash_sink_cb(log_flash_sink_cb_t cb)
+{
+    if (!s_initialized) {
+        return LOG_ERROR_UNINITIALIZED;
+    }
+
+    s_flash_sink_cb = cb;
+
+    return LOG_OK;
+}
+
+/**
  * @brief 日志输出
  * @param level 日志级别
  * @param tag 日志标签
@@ -276,7 +308,13 @@ log_error_t log_hexdump(const char* tag, const uint8_t* data, uint32_t len)
         return LOG_OK;
     }
 
-    char* buf = s_format_buffer;
+    /* TX 暂停期间丢弃实时十六进制转储（不触发落盘钩子，属实时诊断输出） */
+    if (s_output_held) {
+        return LOG_OK;
+    }
+
+    /* 每调用使用栈上缓冲（重入安全：log_log 可在 ISR 与主循环并发调用） */
+    char buf[LOG_DEFAULT_FORMAT_BUFFER_SIZE];
     uint16_t buf_size = s_config.format_buffer_size;
     uint32_t offset = 0;
 
@@ -355,6 +393,19 @@ uint32_t log_tx_len(void)
 }
 
 /**
+ * @brief 获取输出缓冲区剩余可写空间
+ * @return 可写入的字节数，未初始化返回0
+ */
+uint32_t log_tx_avail(void)
+{
+    if (!s_initialized) {
+        return 0;
+    }
+
+    return kfifo_avail(&s_tx_fifo);
+}
+
+/**
  * @brief 从输出缓冲区取出数据
  * @param buffer 目标缓冲区
  * @param len 期望取出的长度
@@ -396,7 +447,9 @@ void log_assert_failed(const char* func, uint32_t line)
 static log_error_t log_format_output(log_level_t level, const char* tag,
     const char* fmt, va_list args)
 {
-    char* buf = s_format_buffer;
+    /* 每调用使用栈上缓冲（重入安全：本函数可能在 ISR 上下文执行，
+       与主循环的 log_log 并发调用时共享静态缓冲会被踩踏产生乱码） */
+    char buf[LOG_DEFAULT_FORMAT_BUFFER_SIZE];
     uint16_t buf_size = s_config.format_buffer_size;
     uint32_t offset = 0;
 
@@ -446,7 +499,16 @@ static log_error_t log_format_output(log_level_t level, const char* tag,
 
     offset += snprintf_(buf + offset, buf_size - offset, "\r\n");
 
-    kfifo_put(&s_tx_fifo, (const uint8_t*)buf, offset);
+    /* TX 暂停期间（如 Flash 日志 dump）屏蔽实时日志输出；落盘钩子不受影响 */
+    if (!s_output_held) {
+        kfifo_put(&s_tx_fifo, (const uint8_t*)buf, offset);
+    }
+
+    /* 落盘钩子：将格式化后的日志行同步上抛给已注册的 Flash 持久化回调，
+       暂停 TX 期间 WARN/ERROR 仍持久化不丢失 */
+    if (s_flash_sink_cb != NULL) {
+        s_flash_sink_cb(level, buf, offset);
+    }
 
     return LOG_OK;
 }
