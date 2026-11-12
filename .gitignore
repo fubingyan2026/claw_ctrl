@@ -1,4 +1,5 @@
 /build/
+/.tools/jlink/
 /tmp/
 /CMakeUserPresets.json
 /.vscode/settings.local.json

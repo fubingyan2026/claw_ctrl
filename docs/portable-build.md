@@ -35,7 +35,13 @@
 排除 `.git`、旧 `build`、`tmp`、`dist`、下载缓存和本机 `.tools/environment.json`。
 首次编译会重新生成本机路径，不需要两台电脑使用相同用户名、盘符或工程目录。
 ZIP 中的隐藏目录 `.tools`、`.vscode` 必须完整保留；不要只复制可见源文件。
-只复制 Git 仓库时 `.tools` 因被忽略不会随仓库传输，此时目标机首次运行仍需联网。
+目标机缺少工程编译工具时，首次运行会尝试联网下载。
+
+## 仅烧录离线包
+
+运行 `package-portable.cmd -FlashOnly -Offline` 可生成 `dist/claw_ctrl-factory-flash-win-x64-*.zip`。其中包含 Release 整包 BIN、J-Link 命令文件和双击烧录脚本。目标机完整解压后可直接烧录预编译的固件。
+
+目标机从 SEGGER 获取自己的 J-Link Commander。烧录脚本依次查找项目内 `.tools/jlink/JLink.exe`、PATH、Program Files 和当前用户的 SEGGER 安装目录，也支持用 `-JLinkExe` 指定路径。SEGGER 的许可要求分发 Commander 前取得书面授权，生成的 ZIP 由用户在目标机配合官方安装使用。[SEGGER 使用条款](https://www.segger.com/products/debug-probes/j-link/tools/terms-of-use/) · [官方安装包](https://www.segger.com/downloads/jlink/)
 
 ## 命令行选项
 
@@ -60,7 +66,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Build failed' }
 ## 编译与烧录调试
 
 一键编译无需连接开发板，也无需 J-Link 软件。
-如需烧录或调试，仍需目标电脑安装 SEGGER J-Link 软件与 USB 驱动；如通过 VS Code 调试，还需安装 VS Code、CMake Tools、C/C++、Cortex-Debug。
+烧录需要 SEGGER J-Link Commander。支持 WinUSB 的探针可使用 Windows 内置驱动，部分旧探针需要 SEGGER USB 驱动。通过 VS Code 调试还需要 J-Link GDB Server、VS Code、CMake Tools、C/C++ 和 Cortex-Debug。[SEGGER WinUSB 说明](https://kb.segger.com/J-Link_WinUSB_driver_selection)
 运行一键编译会自动查找该电脑的 J-Link GDB Server，更新 VS Code 路径；找不到时只提示警告，不阻止编译。
 
 ## 验证范围

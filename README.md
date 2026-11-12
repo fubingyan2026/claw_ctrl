@@ -68,6 +68,8 @@ cmake --build --preset Debug
 
 ## VS Code + J-Link
 
+板卡供电并连接 J-Link SWD 后，双击 `flash-factory.cmd` 可构建并烧录 Release 整包。该流程会全片擦除，再写入 Boot、App A 和初始参数。详见 [CAN 升级与烧录](docs/firmware-upgrade.md)。
+
 以下插件本机均已安装，无需重复安装：
 
 | 插件 | ID | 用途 |

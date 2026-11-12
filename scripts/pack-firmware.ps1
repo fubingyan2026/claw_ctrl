@@ -96,11 +96,12 @@ for ($i = 0; $i -lt $size; $i += $erasedPage.Length) {
 & $Objcopy -I binary -O ihex --change-addresses $FlashBase claw_factory.bin claw_factory.hex
 if ($LASTEXITCODE -ne 0) { throw 'Cannot convert factory image to Intel HEX' }
 
-@"
-ExitOnError 1
-erase
-loadfile claw_factory.bin $FlashBase
-r
-g
-exit
-"@ | Set-Content -Encoding ASCII claw_factory.jlink
+@(
+    'ExitOnError 1'
+    'erase'
+    "loadfile claw_factory.bin $FlashBase"
+    "verifybin claw_factory.bin $FlashBase"
+    'r'
+    'g'
+    'exit'
+) | Set-Content -Encoding ASCII claw_factory.jlink

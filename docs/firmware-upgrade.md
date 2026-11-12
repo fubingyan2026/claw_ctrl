@@ -2,6 +2,12 @@
 
 ## 首次烧录
 
+给板卡供电并连接 J-Link SWD 后，双击根目录的 `flash-factory.cmd`。脚本构建 Release 整包，自动查找 J-Link Commander，随后全片擦除、写入、读回校验并启动固件。全片擦除会清除旧镜像和 ring_storage 记录。
+
+自定义 J-Link 安装位置时可运行 `flash-factory.cmd -JLinkExe "D:\SEGGER\JLink.exe"`。使用本机已有的离线工具可追加 `-Offline`。
+
+可用 `package-portable.cmd -FlashOnly -Offline` 生成预编译烧录包。目标机解压后通过同一个 `flash-factory.cmd` 烧录。J-Link Commander 的准备方式见 [仅烧录离线包](portable-build.md#仅烧录离线包)。
+
 运行 `build-release.cmd`，在 `build/Release` 取得以下文件。Debug 构建生成同名文件。
 
 | 文件 | 用途 |
