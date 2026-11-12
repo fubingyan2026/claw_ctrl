@@ -10,6 +10,7 @@
       "device": "GD32F503KEU7",
       "interface": "swd",
       "executable": "${workspaceFolder}/build/Debug/claw_ctrl.elf",
+      "loadFiles": ["${workspaceFolder}/build/Debug/claw_factory.hex"],
       "runToEntryPoint": "main",
       "preLaunchTask": "Build Debug"
     }

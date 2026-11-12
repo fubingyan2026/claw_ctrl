@@ -58,6 +58,9 @@ bool drv_can_recv(drv_can_msg_t* msg);
 /** @brief 主循环周期调用：提交 TX 队列、检测 Bus-Off 并恢复 */
 void drv_can_poll(void);
 
+/** @brief TX 队列和硬件发送邮箱均已空闲 */
+bool drv_can_tx_idle(void);
+
 /** @brief RX 队列溢出丢帧计数 */
 uint32_t drv_can_get_rx_dropped(void);
 

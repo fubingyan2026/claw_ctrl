@@ -30,7 +30,8 @@ extern "C" {
 #define IND_LEVEL_BLUE (1000U)
 
 void srv_indicator_init(uint32_t now_ms);
-void srv_indicator_update(juxie_aggregate_t state, uint32_t now_ms);
+/* Returns the displayed state. Blink transitions wait for the off phase to finish. */
+juxie_aggregate_t srv_indicator_update(juxie_aggregate_t state, uint32_t now_ms);
 
 #ifdef __cplusplus
 }

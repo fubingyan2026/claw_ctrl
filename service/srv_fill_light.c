@@ -8,13 +8,13 @@ static uint16_t s_target;
 static uint32_t s_last_ms;
 static bool s_initialized;
 
-void srv_fill_light_init(uint32_t now_ms)
+void srv_fill_light_init(uint32_t now_ms, uint16_t target)
 {
     pt1FilterInit(&s_filter, 0.0f);
-    s_target = 0;
+    s_filter.state = (float)drv_fill_light_get();
+    s_target = target;
     s_last_ms = now_ms;
     s_initialized = true;
-    drv_fill_light_set(0);
 }
 
 void srv_fill_light_set_target(uint16_t level, uint32_t now_ms)

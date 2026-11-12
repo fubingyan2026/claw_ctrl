@@ -5,8 +5,8 @@
 #include "srv_fill_light.h"
 int main(void) {
     board_init();
-    drv_fill_light_init();
-    srv_fill_light_init(board_millis());
+    uint16_t light_target = drv_fill_light_init();
+    srv_fill_light_init(board_millis(), light_target);
     log_task_init();
     indicator_task_init();
     for (;;) {

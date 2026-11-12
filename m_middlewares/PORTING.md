@@ -15,8 +15,8 @@
 根工程通过 `add_subdirectory(m_middlewares)` 和 `target_link_libraries(claw_ctrl ... m_middlewares)` 使用静态库。
 通用 C 模块参与编译，未被引用的函数和数据在链接时剔除；数学依赖链接 libm。
 当前实际启用 UART 日志、消息队列、printf、PT1 补光灯滤波；其余通用模块可按需调用。
-SEGGER RTT、CmBacktrace、lwmem、ring_storage 已复制但未加入默认固件构建。启用它们前需完成 GD32 的配置/异常入口/内存分配或 Flash 读写接口适配；尤其来源 CmBacktrace 配置选择 M4，不能直接用其异常汇编替换当前 M33 入口。
-本次未启用动态分配、RTOS、Flash 持久化或 RTT 日志，未更改源工程。
+Boot 和 App 通过 GD32 FMC 驱动接入 ring_storage，保存当前镜像和待安装镜像的大小、CRC32 与版本。SEGGER RTT、CmBacktrace、lwmem 保留为移植参考；来源 CmBacktrace 的异常汇编面向 Cortex-M4。
+本工程为裸机运行，通过 USART0 输出日志。
 
 ## 同名文件兼容
 

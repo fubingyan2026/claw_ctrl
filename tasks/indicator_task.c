@@ -16,8 +16,10 @@
 #include "log.h"
 #include "main.h"
 #include "srv_indicator.h"
+#include "srv_fill_light.h"
 #include "srv_juxie.h"
 #include "srv_board_protocol.h"
+#include "srv_upgrade.h"
 
 #define INDICATOR_TICK_PERIOD_MS (10U)
 
@@ -59,7 +61,12 @@ void indicator_task_init(void)
     s_initialized = true;
 
     s_can_ok = drv_can_init();
-    if (s_can_ok) { srv_board_protocol_init(now); }
+    if (s_can_ok) {
+        srv_board_protocol_init(now);
+        if (!srv_upgrade_init()) {
+            LOG_E("upgrade", "upgrade metadata unavailable");
+        }
+    }
 
     if (!s_can_ok) {
         drv_rgb_led_set(IND_LEVEL_RED, 0U, 0U);
@@ -85,22 +92,11 @@ void indicator_task_step(void)
     while (drv_can_recv(&msg)) {
         if (msg.id == BOARD_CAN_LIGHT_COMMAND_ID) {
             (void)srv_board_protocol_on_frame(&msg, now);
+        } else if (msg.id == BOARD_CAN_UPGRADE_HOST_ID) {
+            srv_upgrade_on_frame(&msg, board_millis());
         } else {
             srv_juxie_on_frame(&msg, now);
         }
-    }
-
-    if ((now - s_last_tick_ms) >= INDICATOR_TICK_PERIOD_MS) {
-        s_last_tick_ms = now;
-        srv_juxie_tick(now);
-
-        juxie_aggregate_t aggregate = srv_juxie_get_aggregate();
-        if (!s_agg_valid || aggregate != s_last_agg) {
-            s_last_agg = aggregate;
-            s_agg_valid = true;
-            LOG_I("indicator", "state -> %s", aggregate_name(aggregate));
-        }
-        srv_indicator_update(aggregate, now);
     }
 
     if (srv_juxie_should_poll(now)) {
@@ -123,4 +119,24 @@ void indicator_task_step(void)
 
     /* 把本轮新入队的同步帧和状态帧尽快提交 */
     drv_can_poll();
+    now = board_millis();
+    const bool reboot_ready = srv_upgrade_step(now);
+    if (now - s_last_tick_ms < INDICATOR_TICK_PERIOD_MS) {
+        return;
+    }
+
+    s_last_tick_ms = now;
+    srv_juxie_tick(now);
+    const juxie_aggregate_t aggregate = srv_upgrade_active() ? JUXIE_AGG_UPGRADE : srv_juxie_get_aggregate();
+    /* ACK can leave immediately. Install once the displayed blue cycle finishes. */
+    const bool finish_upgrade = reboot_ready && s_agg_valid && s_last_agg == JUXIE_AGG_UPGRADE;
+    const juxie_aggregate_t displayed = srv_indicator_update(finish_upgrade ? JUXIE_AGG_OFF : aggregate, now);
+    if (finish_upgrade && displayed == JUXIE_AGG_OFF) {
+        board_install_upgrade(srv_fill_light_get_target());
+    }
+    if (!s_agg_valid || displayed != s_last_agg) {
+        s_last_agg = displayed;
+        s_agg_valid = true;
+        LOG_I("indicator", "state -> %s", aggregate_name(displayed));
+    }
 }

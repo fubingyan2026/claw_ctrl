@@ -28,7 +28,7 @@
 /* memory map */
 MEMORY
 {
-  FLASH    (rx): ORIGIN = 0x08000000, LENGTH = 512K
+  FLASH    (rx): ORIGIN = __flash_base, LENGTH = __flash_size
   RAM      (xrw): ORIGIN = 0x20000000, LENGTH = 64K
 }
 
@@ -47,6 +47,12 @@ SECTIONS
     . = ALIGN(4);
     __Vectors_End = .;
     __Vectors_Size = __Vectors_End - __gVectors;
+  } >FLASH
+
+  .app_header (ORIGIN(FLASH) + __app_header_offset) :
+  {
+    KEEP(*(.app_header))
+    KEEP(*(.boot_header))
   } >FLASH
 
   /* text section, such as program code */

@@ -41,7 +41,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 Release
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 Debug -Fresh
 ```
 
-产物位于 `build/Debug` 或 `build/Release`，包括 ELF、HEX、BIN、MAP。
+产物位于 `build/Debug` 或 `build/Release`，包括 Boot 和 App 的 ELF、HEX、BIN、MAP，以及 [烧录器整包](firmware-upgrade.md)。
 
 直接使用命令行工具时，在当前 PowerShell 中执行：
 
@@ -123,7 +123,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-env.ps1 -Archi
 
 已完成在线 ZIP 校验安装、离线重复配置、Debug/Release 构建，以及仅保留 Windows 系统 PATH 时的 Debug 全量构建。
 实际版本为 GCC 14.2.1、GDB 15.2.90、CMake 3.31.6、Ninja 1.12.1。
-Debug BIN 15612 字节，Release BIN 13468 字节；编译命令中均使用 `.tools` 的独立编译器。尚未连接实板验证调试和外设。
+编译命令中均使用 `.tools` 的独立编译器。尚未连接实板验证调试和外设。
 
 ## 5. 常见问题
 

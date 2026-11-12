@@ -13,7 +13,8 @@ try {
     & (Join-Path $PSScriptRoot 'setup-env.ps1') -PortableBuildTools -Offline:$Offline
     Write-Host "[2/2] Building $Configuration..."
     & (Join-Path $PSScriptRoot 'build.ps1') -Configuration $Configuration -Clean:$Clean
-    Write-Host "Build succeeded. Output: $projectRoot/build/$Configuration/claw_ctrl.bin"
+    Write-Host "Factory image: $projectRoot/build/$Configuration/claw_factory.hex"
+    Write-Host "CAN update: $projectRoot/build/$Configuration/claw_ctrl.bin"
     exit 0
 } catch {
     Write-Host "Build failed: $($_.Exception.Message)" -ForegroundColor Red

@@ -7,7 +7,7 @@
 
 - 双击 `build.cmd`：Debug。
 - 双击 `build-release.cmd`：Release。
-- 成功后产物在 `build/Debug` 或 `build/Release`，包括 `claw_ctrl.bin`、`.hex`、`.elf`。
+- 成功后产物在 `build/Debug` 或 `build/Release`。烧录器用 `claw_factory.hex`，CAN 升级用 `claw_ctrl.bin`。详见 [CAN 升级与烧录](firmware-upgrade.md)。
 - 窗口会显示编译结果并等待按键，报错时可直接查看原因。
 
 工具缺失时首次运行会从官方地址下载固定版本并验证 SHA-256；有工具时直接复用 `.tools`。

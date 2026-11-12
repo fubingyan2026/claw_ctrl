@@ -32,7 +32,7 @@ extern "C" {
 #endif
 
 #ifndef JUXIE_LINK_TIMEOUT_MS
-#define JUXIE_LINK_TIMEOUT_MS (1500U)
+#define JUXIE_LINK_TIMEOUT_MS (1000U)
 #endif
 #ifndef JUXIE_CONTROL_IDLE_MS
 #define JUXIE_CONTROL_IDLE_MS (500U)

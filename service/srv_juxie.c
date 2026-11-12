@@ -203,8 +203,12 @@ juxie_aggregate_t srv_juxie_get_aggregate(void)
 {
     bool any_fault = false;
     bool all_normal = true;
+    uint8_t detected_count = 0U;
 
     for (uint8_t i = 0; i < JUXIE_MOTOR_COUNT; i++) {
+        if (s_motors[i].ever_seen) {
+            ++detected_count;
+        }
         if (s_motors[i].state == JUXIE_MOTOR_FAULT) {
             any_fault = true;
         }
@@ -213,7 +217,7 @@ juxie_aggregate_t srv_juxie_get_aggregate(void)
         }
     }
 
-    if (any_fault) {
+    if (any_fault || (detected_count > 0U && detected_count < JUXIE_MOTOR_COUNT)) {
         return JUXIE_AGG_FAULT;
     }
     if (s_upgrade_active) {

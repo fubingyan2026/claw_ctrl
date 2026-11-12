@@ -25,9 +25,9 @@ Windows x64 上双击根目录 `build.cmd` 编译 Debug，双击 `build-release.
 
 双电机 Dev_ID 默认 1/2；反馈 ID 为 0x301/0x302，支持参考工程的 12/16 字节反馈。
 CAN FD 使用 ISO 模式，仲裁段/数据段均 1Mbps，不启用 BRS。
-空闲 500ms 后周期发送 0x80 同步查询；离线判定为 1500ms；检测 0x701 升级会话，超时 6000ms。
-状态指示：正常白色常亮，故障红色常亮，未使能绿色闪烁，升级蓝色闪烁。
-该工程检测升级会话，不实现 MCU 自身 bootloader，也不实现电机固件升级传输。
+空闲 500 ms 后周期发送 0x80 同步查询。电机反馈超时为 1000 ms，0x701 升级会话超时为 6000 ms。
+状态指示：两台电机均正常使能时白灯常亮。任一台故障或只检测到一台时红灯常亮。未就绪或未全部使能时绿灯闪烁，升级时蓝灯闪烁。闪烁状态完成当前周期（亮 500 ms、灭 500 ms）后再切换。电机状态中故障优先。
+夹爪板自身通过 CAN 在 App 中接收升级，蓝灯闪烁，重启后由 Boot 安装新固件。详见 [CAN 升级与烧录](docs/firmware-upgrade.md)。
 
 补光灯通过 `0x220` 设置 5 kHz PWM 亮度（0..1000 对应 0..100% 占空比，0 立即关灯，非零平滑变化），上电默认关闭；控制板每 500ms 主动发送 `0x221` 心跳/状态，合法调光命令另触发即时状态上报。完整字段、示例和时序见 [CAN 协议 V1.2](docs/can-protocol.md)。
 USART0 为 PB6 TX / PB7 RX，115200 8N1。日志 TX 使用 DMA0 CH3；RX 引脚已配置，未实现 RX DMA/接收协议。
@@ -38,7 +38,7 @@ USART0 为 PB6 TX / PB7 RX，115200 8N1。日志 TX 使用 DMA0 CH3；RX 引脚�
 
 - 使用独立 Arm GNU Toolchain 14.2.Rel1，编译目标为 Cortex-M33 + FPv5-SP，hard float。
 - 使用 `scripts/setup-env.ps1` 配置 CMake、Ninja、Arm GCC/GDB 和 VS Code；工具路径保存在 `.tools/environment.json`。
-- Flash 512KB、SRAM 64KB；使用官方 GD32F503xE 链接脚本，保留 2KB 栈和 1KB 堆。
+- Flash 512KB、SRAM 64KB。Boot、App A、App B 和升级参数使用固定分区，每个可执行镜像保留 2KB 栈和 1KB 堆。
 - 官方 8MHz 外部晶振配置提供 252MHz 系统时钟；CAN 时序及 PWM 分频与此配置配套。
 
 首次配置（无管理员权限，详见 [Windows 环境教程](docs/windows-toolchain.md)）：
@@ -62,7 +62,7 @@ cmake --preset Debug
 cmake --build --preset Debug
 ```
 
-输出位于 `build/Debug` 或 `build/Release`：`claw_ctrl.elf`、`claw_ctrl.hex`、`claw_ctrl.bin`、`claw_ctrl.map`、`compile_commands.json`。
+输出位于 `build/Debug` 或 `build/Release`。`claw_factory.hex` 是烧录器整包，`claw_factory.bin` 是同一整包的 BIN 格式，`claw_ctrl.bin` 用于 CAN 升级。Boot 和 App 各自的 ELF、HEX、BIN 和 MAP 也会生成。
 移到其他电脑或更换工程位置后，重新运行 `scripts/setup-env.ps1` 生成本机配置。
 工程不再查找 STM32CubeIDE；可用 `-ArmGccBin` 指定其他独立工具链的 bin 目录，切换编译器时构建脚本自动刷新 CMake 缓存。
 
@@ -79,7 +79,7 @@ cmake --build --preset Debug
 1. 先运行环境脚本，再用 VS Code 打开本工程根目录；若已打开，运行 `Developer: Reload Window`，选择 CMake Configure Preset `Debug`。
 2. 按 Ctrl+Shift+B 运行默认 `Build Debug`；也可通过 CMake Tools 构建。
 3. 按原理图连接 J-Link：U3 脚1 GND、脚2 SWDIO、脚3 SWCLK、脚4 VTref(3V3)。板子正常供电。U3 没有 NRST。
-4. 在“运行和调试”选择 `GD32F503 J-Link (SWD)`，按 F5；先构建，再下载 Debug ELF，停在 `main`。
+4. 在“运行和调试”选择 `GD32F503 J-Link (SWD)`，按 F5。构建后下载 `claw_factory.hex`，用 App ELF 提供调试符号并停在 App 的 `main`。
 
 已检查本机 J-Link V9.50 的设备库包含精确型号 `GD32F503KEU7`，launch.json 使用此名称。
 尚未连接实板验证下载、断点、CAN 通信、PWM 波形和日志输出。
