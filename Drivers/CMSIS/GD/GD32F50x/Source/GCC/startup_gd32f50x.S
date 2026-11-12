@@ -44,6 +44,7 @@
 
 /* reset Handler */
 Reset_Handler:
+  bl      board_reset_gpio   /* Board hook before SRAM and clock initialization. */
 
   ldr     r4, =0x1ffff802
   ldr     r5, [r4]

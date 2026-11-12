@@ -11,6 +11,7 @@ static uint8_t motor_state_to_wire(juxie_aggregate_t state)
 {
     switch (state) {
     case JUXIE_AGG_OFF: return 0x00U;
+    case JUXIE_AGG_WAITING:
     case JUXIE_AGG_DISABLED: return 0x01U;
     case JUXIE_AGG_NORMAL: return 0x02U;
     case JUXIE_AGG_UPGRADE: return 0x03U;

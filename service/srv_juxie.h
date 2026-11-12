@@ -64,6 +64,7 @@ typedef enum {
     JUXIE_AGG_NORMAL,
     JUXIE_AGG_UPGRADE,
     JUXIE_AGG_FAULT,
+    JUXIE_AGG_WAITING,
 } juxie_aggregate_t;
 
 void srv_juxie_init(uint32_t now_ms);

@@ -130,6 +130,7 @@ void srv_juxie_init(uint32_t now_ms)
     memset(s_motors, 0, sizeof(s_motors));
     for (uint8_t i = 0; i < JUXIE_MOTOR_COUNT; i++) {
         s_motors[i].state = JUXIE_MOTOR_UNKNOWN;
+        s_motors[i].last_feedback_ms = now_ms;
     }
 
     s_upgrade_active = false;
@@ -172,12 +173,8 @@ void srv_juxie_tick(uint32_t now_ms)
     for (uint8_t i = 0; i < JUXIE_MOTOR_COUNT; i++) {
         juxie_motor_ctx_t* motor = &s_motors[i];
 
-        if (s_upgrade_active) {
-            motor->link_lost = false;
-        } else {
-            motor->link_lost = motor->ever_seen
-                && ((now_ms - motor->last_feedback_ms) > JUXIE_LINK_TIMEOUT_MS);
-        }
+        motor->link_lost = !s_upgrade_active &&
+            (now_ms - motor->last_feedback_ms) > JUXIE_LINK_TIMEOUT_MS;
 
         if (motor->explicit_fault || motor->link_lost) {
             motor->state = JUXIE_MOTOR_FAULT;
@@ -222,6 +219,9 @@ juxie_aggregate_t srv_juxie_get_aggregate(void)
     }
     if (s_upgrade_active) {
         return JUXIE_AGG_UPGRADE;
+    }
+    if (detected_count == 0U) {
+        return JUXIE_AGG_WAITING;
     }
     if (!all_normal) {
         return JUXIE_AGG_DISABLED;

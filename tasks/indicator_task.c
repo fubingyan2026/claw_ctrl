@@ -43,6 +43,8 @@ static const char* aggregate_name(juxie_aggregate_t state)
         return "upgrade";
     case JUXIE_AGG_FAULT:
         return "fault";
+    case JUXIE_AGG_WAITING:
+        return "waiting";
     case JUXIE_AGG_OFF:
     default:
         return "off";

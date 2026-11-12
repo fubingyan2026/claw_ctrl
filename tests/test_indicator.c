@@ -19,8 +19,34 @@ static void check(juxie_aggregate_t request, uint32_t now, juxie_aggregate_t dis
     assert(red == r && green == g && blue == b);
 }
 
+static void test_startup(void)
+{
+    const uint32_t start = 100U;
+    const uint32_t deadline = start + JUXIE_LINK_TIMEOUT_MS;
+    srv_juxie_init(start);
+    srv_indicator_init(start);
+    srv_juxie_tick(start);
+    check(srv_juxie_get_aggregate(), start, JUXIE_AGG_WAITING, 0, 0, 0);
+    srv_juxie_tick(deadline);
+    check(srv_juxie_get_aggregate(), deadline, JUXIE_AGG_WAITING, 0, 0, 0);
+    srv_juxie_tick(deadline + 1U);
+    check(srv_juxie_get_aggregate(), deadline + 1U, JUXIE_AGG_FAULT, IND_LEVEL_RED, 0, 0);
+
+    srv_juxie_init(start);
+    srv_indicator_init(start);
+    check(srv_juxie_get_aggregate(), start, JUXIE_AGG_WAITING, 0, 0, 0);
+    const uint32_t now = start + 100U;
+    drv_can_msg_t feedback = {.id = JUXIE_FEEDBACK_BASE | JUXIE_DEV_ID_PRIMARY, .fd = true, .dlc = 12};
+    srv_juxie_on_frame(&feedback, now);
+    feedback.id = JUXIE_FEEDBACK_BASE | JUXIE_DEV_ID_MIRROR;
+    srv_juxie_on_frame(&feedback, now);
+    srv_juxie_tick(now);
+    check(srv_juxie_get_aggregate(), now, JUXIE_AGG_DISABLED, 0, IND_LEVEL_GREEN, 0);
+}
+
 int main(void)
 {
+    test_startup();
     srv_indicator_init(0);
     check(JUXIE_AGG_UPGRADE, 10, JUXIE_AGG_UPGRADE, 0, 0, IND_LEVEL_BLUE);
     check(JUXIE_AGG_FAULT, 509, JUXIE_AGG_UPGRADE, 0, 0, IND_LEVEL_BLUE);
@@ -45,6 +71,6 @@ int main(void)
     check(JUXIE_AGG_UPGRADE, start, JUXIE_AGG_UPGRADE, 0, 0, IND_LEVEL_BLUE);
     check(JUXIE_AGG_OFF, start + 500U, JUXIE_AGG_UPGRADE, 0, 0, 0);
     check(JUXIE_AGG_OFF, start + 1000U, JUXIE_AGG_OFF, 0, 0, 0);
-    puts("PASS: complete blink cycles, delayed ticks, color changes and tick rollover");
+    puts("PASS: startup indicator, complete blink cycles, delayed ticks, color changes and tick rollover");
     return 0;
 }

@@ -71,6 +71,7 @@ juxie_aggregate_t srv_indicator_update(juxie_aggregate_t state, uint32_t now_ms)
             b = IND_LEVEL_BLUE;
         }
         break;
+    case JUXIE_AGG_WAITING:
     case JUXIE_AGG_OFF:
     default:
         break;

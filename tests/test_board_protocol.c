@@ -62,6 +62,16 @@ int main(void) {
     for(unsigned i=4;i<8;++i) {msg=command(500);msg.data[i]=1;rejected(&msg);}
     unsigned before=attempts; srv_board_protocol_step(999);assert(attempts==before);
     srv_board_protocol_step(1000);assert(attempts==before+1); // Immediate reports did not shift schedule.
+    check_status(1000, 1, 1000);
+    msg = command(1000);
+    assert(srv_board_protocol_on_frame(&msg, 1001));
+    check_status(1000, 4, 1001);
+    assert(srv_juxie_get_motor(0) == JUXIE_MOTOR_FAULT);
+    assert(srv_juxie_get_motor(1) == JUXIE_MOTOR_FAULT);
+    feedback(JUXIE_DEV_ID_PRIMARY, JUXIE_STATUS_ENABLED, 0, 1100);
+    feedback(JUXIE_DEV_ID_MIRROR, JUXIE_STATUS_ENABLED, 0, 1100);
+    srv_board_protocol_step(1500);
+    check_status(1000, 2, 1500);
 
     const unsigned motor_ids[] = {JUXIE_DEV_ID_PRIMARY, JUXIE_DEV_ID_MIRROR};
     for (unsigned i = 0; i < JUXIE_MOTOR_COUNT; ++i) {
@@ -86,6 +96,15 @@ int main(void) {
     srv_board_protocol_step(8000);check_status(250,4,8000); // Heartbeat survives motor/upgrade timeout.
 
     reset(0);
+    srv_juxie_on_frame(&boot, 500);
+    srv_board_protocol_step(1500);
+    check_status(0, 3, 1500);
+    boot.data[0] = 6; // Cancel the motor upgrade while neither motor has reported.
+    srv_juxie_on_frame(&boot, 1501);
+    srv_board_protocol_step(2000);
+    check_status(0, 4, 2000);
+
+    reset(0);
     feedback(JUXIE_DEV_ID_PRIMARY, JUXIE_STATUS_ENABLED, 0, 0);
     feedback(JUXIE_DEV_ID_MIRROR, JUXIE_STATUS_ENABLED, 0, 1000);
     srv_board_protocol_step(1000);
@@ -97,10 +116,11 @@ int main(void) {
     reset(0);accept_tx=false;srv_board_protocol_step(500);assert(attempts==1);
     srv_board_protocol_step(501);assert(attempts==1);srv_board_protocol_step(1000);assert(attempts==2);
     msg=command(1000);assert(srv_board_protocol_on_frame(&msg,1100));assert(srv_fill_light_get_target()==1000 && attempts==3);
-    accept_tx=true;srv_board_protocol_step(1500);check_status(1000,1,1500);
+    accept_tx=true;srv_board_protocol_step(1500);check_status(1000,4,1500);
     reset(UINT32_MAX-250U);srv_board_protocol_step(248);assert(attempts==0);
     srv_board_protocol_step(249);assert(attempts==1);check_status(0,1,249);
-    srv_board_protocol_step(5000);assert(attempts==2);srv_board_protocol_step(5000);assert(attempts==2);
+    srv_board_protocol_step(5000);assert(attempts==2);check_status(0,4,5000);
+    srv_board_protocol_step(5000);assert(attempts==2);
     reset(0); srv_fill_light_set_target(1000,0);
     assert(level==0 && srv_fill_light_get_target()==1000);
     srv_fill_light_step(9); assert(level==0);

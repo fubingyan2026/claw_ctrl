@@ -69,6 +69,7 @@ target_link_libraries(claw_boot PRIVATE upgrade_storage)
 target_compile_options(claw_boot PRIVATE -Wall -Wextra -Wshadow)
 
 function(configure_image target base size)
+    target_sources(${target} PRIVATE Core/Src/board_reset_gpio.S)
     set_target_properties(${target} PROPERTIES SUFFIX .elf)
     set(linker_script ${CMAKE_CURRENT_SOURCE_DIR}/gd32f503xE_flash.ld)
     target_link_options(${target} PRIVATE

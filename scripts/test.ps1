@@ -11,7 +11,7 @@ try {
     if($LASTEXITCODE -ne 0) { throw 'Middleware test compilation failed' }
     wsl -d Ubuntu --exec ./build/host-tests/test_middleware_port
     if($LASTEXITCODE -ne 0) { throw 'Middleware tests failed' }
-    wsl -d Ubuntu --exec gcc -std=c11 -Wall -Wextra -Werror "-fsanitize=address,undefined" -g -Iservice -Idevice_drivers tests/test_indicator.c service/srv_indicator.c -o build/host-tests/test_indicator
+    wsl -d Ubuntu --exec gcc -std=c11 -Wall -Wextra -Werror "-fsanitize=address,undefined" -g -Iservice -Idevice_drivers tests/test_indicator.c service/srv_indicator.c service/srv_juxie.c -o build/host-tests/test_indicator
     if($LASTEXITCODE -ne 0) { throw 'Indicator test compilation failed' }
     wsl -d Ubuntu --exec ./build/host-tests/test_indicator
     if($LASTEXITCODE -ne 0) { throw 'Indicator tests failed' }
