@@ -3,9 +3,6 @@
 #include "srv_fill_light.h"
 #include "srv_juxie.h"
 
-static bool s_initialized;
-static uint32_t s_last_heartbeat_ms;
-
 /* Wire values are explicit, independent of the internal enum numbering. */
 static uint8_t motor_state_to_wire(juxie_aggregate_t state)
 {
@@ -41,36 +38,32 @@ static void send_status(uint32_t now_ms)
     (void)drv_can_send(&status);
 }
 
-void srv_board_protocol_init(uint32_t now_ms)
-{
-    s_last_heartbeat_ms = now_ms;
-    s_initialized = true;
-}
-
 bool srv_board_protocol_on_frame(const drv_can_msg_t *msg, uint32_t now_ms)
 {
-    if (!s_initialized || !msg || msg->extended || !msg->fd ||
-        msg->id != BOARD_CAN_LIGHT_COMMAND_ID || msg->dlc != BOARD_PROTOCOL_LENGTH ||
-        msg->data[0] != BOARD_PROTOCOL_VERSION || msg->data[1] != BOARD_LIGHT_SET_COMMAND) {
+    if (!msg || msg->id != BOARD_CAN_REQUEST_ID || msg->extended || !msg->fd ||
+        msg->dlc != BOARD_PROTOCOL_LENGTH || msg->data[0] != BOARD_PROTOCOL_VERSION) {
         return false;
     }
     for (unsigned i = 4U; i < BOARD_PROTOCOL_LENGTH; ++i) {
         if (msg->data[i] != 0U) { return false; }
     }
-    uint16_t level = (uint16_t)msg->data[2] | ((uint16_t)msg->data[3] << 8);
-    if (level > DRV_FILL_LIGHT_LEVEL_MAX) { return false; }
+    switch (msg->data[1]) {
+    case BOARD_STATUS_QUERY_COMMAND:
+        break;
+    case BOARD_LIGHT_SET_COMMAND: {
+        const uint16_t level = (uint16_t)msg->data[2] | ((uint16_t)msg->data[3] << 8);
+        if (level > DRV_FILL_LIGHT_LEVEL_MAX) {
+            return false;
+        }
+        if (level != srv_fill_light_get_target()) {
+            srv_fill_light_set_target(level, now_ms);
+        }
+        break;
+    }
+    default:
+        return false;
+    }
 
-    srv_fill_light_set_target(level, now_ms);
     send_status(now_ms);
     return true;
-}
-
-void srv_board_protocol_step(uint32_t now_ms)
-{
-    if (!s_initialized || (uint32_t)(now_ms - s_last_heartbeat_ms) < BOARD_HEARTBEAT_PERIOD_MS) {
-        return;
-    }
-    /* Skip missed periods rather than flooding the bus after a long delay. */
-    s_last_heartbeat_ms = now_ms;
-    send_status(now_ms);
 }

@@ -16,13 +16,22 @@ void drv_fill_light_set(uint16_t value) { level = value; ++set_calls; }
 uint16_t drv_fill_light_get(void) { return level; }
 bool drv_can_send(const drv_can_msg_t *msg) { last = *msg; ++attempts; return accept_tx; }
 static drv_can_msg_t command(unsigned value) {
-    drv_can_msg_t msg = {.id=BOARD_CAN_LIGHT_COMMAND_ID,.fd=true,.dlc=8,
+    drv_can_msg_t msg = {.id=0x220,.fd=true,.dlc=8,
         .data={1,1,(uint8_t)value,(uint8_t)(value>>8),0,0,0,0}};
     return msg;
 }
 static void reset(uint32_t now) {
     srv_fill_light_init(now, drv_fill_light_init()); attempts=set_calls=0; accept_tx=true;
-    srv_juxie_init(now); srv_board_protocol_init(now);
+    srv_juxie_init(now);
+}
+static const drv_can_msg_t query = {
+    .id = 0x220, .fd = true, .dlc = 8, .data = {1, 0},
+};
+static void request_status(uint32_t now) {
+    unsigned before = attempts;
+    unsigned before_set = set_calls;
+    assert(srv_board_protocol_on_frame(&query, now));
+    assert(attempts == before + 1 && set_calls == before_set);
 }
 static void check_status(unsigned expected_level,unsigned state,uint32_t now) {
     assert(last.id==0x221 && last.fd && !last.extended && last.dlc==8);
@@ -41,16 +50,22 @@ static void feedback(unsigned id,unsigned status,unsigned error,uint32_t now) {
     srv_juxie_on_frame(&msg,now);
 }
 int main(void) {
-    drv_can_msg_t msg=command(500);
-    rejected(&msg); srv_board_protocol_step(1000); assert(attempts==0);
-    reset(0); srv_board_protocol_step(499); assert(attempts==0);
-    srv_board_protocol_step(500); assert(attempts==1); check_status(0,1,500);
+    reset(0);
+    srv_juxie_tick(500);
+    assert(attempts == 0);
+    request_status(500);
+    check_status(0, 1, 500);
+    drv_can_msg_t msg;
     unsigned values[]={0,1,250,500,999,1000};
     for(unsigned i=0;i<sizeof(values)/sizeof(values[0]);++i) {
         msg=command(values[i]); unsigned before=attempts;
-        assert(srv_board_protocol_on_frame(&msg,700+i)); assert(attempts==before+1);
-        check_status(values[i],1,700+i);
-        assert(srv_board_protocol_on_frame(&msg,700+i)); assert(srv_fill_light_get_target()==values[i]);
+        const uint32_t now = 700U + i * 2U;
+        assert(srv_board_protocol_on_frame(&msg, now));
+        assert(attempts == before + 1 && srv_fill_light_get_target() == values[i]);
+        check_status(values[i], 1, now);
+        assert(srv_board_protocol_on_frame(&msg, now + 1U));
+        assert(attempts == before + 2);
+        check_status(values[i], 1, now + 1U);
     }
     msg=command(1001);rejected(&msg);msg=command(65535);rejected(&msg);rejected(NULL);
     msg=command(500);msg.id=0x221;rejected(&msg);
@@ -60,67 +75,93 @@ int main(void) {
     msg=command(500);msg.data[0]=2;rejected(&msg);
     msg=command(500);msg.data[1]=2;rejected(&msg);
     for(unsigned i=4;i<8;++i) {msg=command(500);msg.data[i]=1;rejected(&msg);}
-    unsigned before=attempts; srv_board_protocol_step(999);assert(attempts==before);
-    srv_board_protocol_step(1000);assert(attempts==before+1); // Immediate reports did not shift schedule.
+    msg = query; msg.extended = true; rejected(&msg);
+    msg = query; msg.fd = false; rejected(&msg);
+    msg = query; msg.dlc = 0; rejected(&msg);
+    msg = query; msg.data[0] = 2; rejected(&msg);
+    msg = query; msg.data[1] = 2; rejected(&msg);
+    msg = query; msg.id = 0x222; rejected(&msg);
+    for (unsigned i = 4; i < 8; ++i) { msg = query; msg.data[i] = 1; rejected(&msg); }
+    msg = query; msg.data[2] = 0xff; msg.data[3] = 0xff;
+    unsigned before_set = set_calls, before_tx = attempts;
+    assert(srv_board_protocol_on_frame(&msg, 999));
+    assert(srv_fill_light_get_target() == 1000 && set_calls == before_set && attempts == before_tx + 1);
+    check_status(1000, 1, 999);
+    request_status(1000);
     check_status(1000, 1, 1000);
-    msg = command(1000);
-    assert(srv_board_protocol_on_frame(&msg, 1001));
+    request_status(1001);
     check_status(1000, 4, 1001);
     assert(srv_juxie_get_motor(0) == JUXIE_MOTOR_FAULT);
     assert(srv_juxie_get_motor(1) == JUXIE_MOTOR_FAULT);
     feedback(JUXIE_DEV_ID_PRIMARY, JUXIE_STATUS_ENABLED, 0, 1100);
     feedback(JUXIE_DEV_ID_MIRROR, JUXIE_STATUS_ENABLED, 0, 1100);
-    srv_board_protocol_step(1500);
+    request_status(1500);
     check_status(1000, 2, 1500);
 
     const unsigned motor_ids[] = {JUXIE_DEV_ID_PRIMARY, JUXIE_DEV_ID_MIRROR};
     for (unsigned i = 0; i < JUXIE_MOTOR_COUNT; ++i) {
         reset(0);
         feedback(motor_ids[i], 0, 0, 490);
-        srv_board_protocol_step(500);
+        request_status(500);
         check_status(0, 4, 500); // Either motor alone is a fault, even when disabled.
 
         feedback(motor_ids[1U - i], 0, 0, 510);
-        srv_board_protocol_step(1000);
+        request_status(1000);
         check_status(0, 1, 1000); // Both detected and disabled.
     }
 
     reset(0);msg=command(500);assert(srv_board_protocol_on_frame(&msg,490));
-    assert(srv_juxie_should_poll(500)); // Lighting does not suppress motor idle polling.
+    request_status(490);
+    assert(srv_juxie_should_poll(500)); // Board commands do not suppress motor idle polling.
     feedback(1,0x80,0,510);feedback(2,0x80,0,510);
-    srv_board_protocol_step(1000);check_status(500,2,1000);
-    feedback(2,0x80,1,1010);msg=command(250);assert(srv_board_protocol_on_frame(&msg,1010));check_status(250,4,1010);
-    feedback(2,0,0,1020);assert(srv_board_protocol_on_frame(&msg,1020));check_status(250,1,1020);
+    request_status(1000);check_status(500,2,1000);
+    feedback(2,0x80,1,1010);msg=command(250);assert(srv_board_protocol_on_frame(&msg,1010));
+    check_status(250,4,1010);
+    feedback(2,0,0,1020);request_status(1020);check_status(250,1,1020);
     drv_can_msg_t boot={.id=0x701,.fd=true,.dlc=1,.data={1}};
-    srv_juxie_on_frame(&boot,1100);srv_board_protocol_step(1500);check_status(250,3,1500);
-    srv_board_protocol_step(8000);check_status(250,4,8000); // Heartbeat survives motor/upgrade timeout.
+    srv_juxie_on_frame(&boot,1100);request_status(1500);check_status(250,3,1500);
+    request_status(8000);check_status(250,4,8000);
 
     reset(0);
     srv_juxie_on_frame(&boot, 500);
-    srv_board_protocol_step(1500);
+    request_status(1500);
     check_status(0, 3, 1500);
     boot.data[0] = 6; // Cancel the motor upgrade while neither motor has reported.
     srv_juxie_on_frame(&boot, 1501);
-    srv_board_protocol_step(2000);
+    request_status(2000);
     check_status(0, 4, 2000);
 
     reset(0);
     feedback(JUXIE_DEV_ID_PRIMARY, JUXIE_STATUS_ENABLED, 0, 0);
     feedback(JUXIE_DEV_ID_MIRROR, JUXIE_STATUS_ENABLED, 0, 1000);
-    srv_board_protocol_step(1000);
+    request_status(1000);
     check_status(0, 2, 1000);
     msg = command(250);
     assert(srv_board_protocol_on_frame(&msg, 1001));
     check_status(250, 4, 1001);
 
-    reset(0);accept_tx=false;srv_board_protocol_step(500);assert(attempts==1);
-    srv_board_protocol_step(501);assert(attempts==1);srv_board_protocol_step(1000);assert(attempts==2);
-    msg=command(1000);assert(srv_board_protocol_on_frame(&msg,1100));assert(srv_fill_light_get_target()==1000 && attempts==3);
-    accept_tx=true;srv_board_protocol_step(1500);check_status(1000,4,1500);
-    reset(UINT32_MAX-250U);srv_board_protocol_step(248);assert(attempts==0);
-    srv_board_protocol_step(249);assert(attempts==1);check_status(0,1,249);
-    srv_board_protocol_step(5000);assert(attempts==2);check_status(0,4,5000);
-    srv_board_protocol_step(5000);assert(attempts==2);
+    reset(0);accept_tx=false;request_status(500);assert(attempts==1);
+    msg=command(1000);assert(srv_board_protocol_on_frame(&msg,1100));
+    assert(srv_fill_light_get_target()==1000 && attempts==2);
+    accept_tx=true;request_status(1500);check_status(1000,4,1500);
+    reset(UINT32_MAX-250U);
+    request_status(UINT32_MAX);check_status(0,1,UINT32_MAX);
+    request_status(0);check_status(0,1,0);
+    request_status(5000);check_status(0,4,5000);
+
+    reset(0);
+    msg = command(1000);
+    assert(srv_board_protocol_on_frame(&msg, 0));
+    assert(srv_board_protocol_on_frame(&msg, 9));
+    srv_fill_light_step(10);
+    assert(level == 91);
+    msg = command(0);
+    assert(srv_board_protocol_on_frame(&msg, 11));
+    assert(level == 0);
+    before_set = set_calls;
+    assert(srv_board_protocol_on_frame(&msg, 12));
+    assert(set_calls == before_set);
+    check_status(0, 1, 12);
     reset(0); srv_fill_light_set_target(1000,0);
     assert(level==0 && srv_fill_light_get_target()==1000);
     srv_fill_light_step(9); assert(level==0);
@@ -146,6 +187,6 @@ int main(void) {
     assert(level == 350 && srv_fill_light_get_target() == 900 && set_calls == before_resume);
     srv_fill_light_step(1010);
     assert(level == 400);
-    puts("PASS: light validation, immediate/periodic status, motor integration, queue-full and time rollover");
+    puts("PASS: request/reply, repeated settings, motor integration, queue-full and time rollover");
     return 0;
 }

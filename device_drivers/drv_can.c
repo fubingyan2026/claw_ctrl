@@ -13,7 +13,7 @@ static uint32_t tx_dropped, last_status;
 static const uint16_t filters[][2] = {
     { 0x080, 0x7ff }, { 0x100, 0x780 }, { 0x200, 0x7ff }, { 0x210, 0x7ff },
     { 0x300, 0x780 }, { 0x600, 0x780 }, { 0x701, 0x7ff },
-    { BOARD_CAN_LIGHT_COMMAND_ID, 0x7ff }, { BOARD_CAN_UPGRADE_HOST_ID, 0x7ff }
+    { BOARD_CAN_REQUEST_ID, 0x7ff }, { BOARD_CAN_UPGRADE_HOST_ID, 0x7ff }
 };
 _Static_assert(sizeof(filters) / sizeof(filters[0]) <= 14U, "CAN0 filter bank capacity exceeded");
 _Static_assert((DRV_CAN_RX_QUEUE_DEPTH & (DRV_CAN_RX_QUEUE_DEPTH - 1U)) == 0, "RX depth");

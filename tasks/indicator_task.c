@@ -6,7 +6,7 @@
 
 /**
  * @file    indicator_task.c
- * @brief   双电机状态指示、补光灯命令和控制板心跳任务
+ * @brief   双电机状态指示、补光灯命令和控制板状态查询任务
  */
 
 #include "indicator_task.h"
@@ -63,11 +63,8 @@ void indicator_task_init(void)
     s_initialized = true;
 
     s_can_ok = drv_can_init();
-    if (s_can_ok) {
-        srv_board_protocol_init(now);
-        if (!srv_upgrade_init()) {
-            LOG_E("upgrade", "upgrade metadata unavailable");
-        }
+    if (s_can_ok && !srv_upgrade_init()) {
+        LOG_E("upgrade", "upgrade metadata unavailable");
     }
 
     if (!s_can_ok) {
@@ -92,8 +89,8 @@ void indicator_task_step(void)
 
     drv_can_msg_t msg;
     while (drv_can_recv(&msg)) {
-        if (msg.id == BOARD_CAN_LIGHT_COMMAND_ID) {
-            (void)srv_board_protocol_on_frame(&msg, now);
+        if (msg.id == BOARD_CAN_REQUEST_ID) {
+            (void)srv_board_protocol_on_frame(&msg, board_millis());
         } else if (msg.id == BOARD_CAN_UPGRADE_HOST_ID) {
             srv_upgrade_on_frame(&msg, board_millis());
         } else {
@@ -117,9 +114,7 @@ void indicator_task_step(void)
         s_last_drop_log_ms = now;
     }
 
-    srv_board_protocol_step(now);
-
-    /* 把本轮新入队的同步帧和状态帧尽快提交 */
+    /* 把本轮新入队的同步帧和状态回复尽快提交 */
     drv_can_poll();
     now = board_millis();
     const bool reboot_ready = srv_upgrade_step(now);
